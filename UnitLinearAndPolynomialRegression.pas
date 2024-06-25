@@ -48,6 +48,9 @@ var
   ndata : Integer;
   datax, datay : array [0..1000] of Real;
   order : Extended;
+type
+  TMatrix = array[0..2] of array[0..3] of Extended;
+  TArrayOfExtended = array of Extended;
 
 implementation
 {$R *.dfm}
@@ -66,6 +69,61 @@ begin
     StringGrid.Cells[column1, i] := StringGrid.Cells[column2, i];
     StringGrid.Cells[column2, i] := temp;
   end;
+end;
+
+function Solve3x4MatrixByGaussianElimination(StringGrid2: TStringGrid; var A: TMatrix): TArrayOfExtended;
+const
+  Rows = 3;
+  Cols = 4;
+var
+  i, j, k: Integer;
+  factor: Extended;
+  X: TArrayOfExtended;
+begin
+  SetLength(X, Rows);
+
+  for i := 0 to Rows - 2 do
+  begin
+    for k := i + 1 to Rows - 1 do
+    begin
+      if Abs(A[i, i]) < Abs(A[k, i]) then
+      begin
+        for j := 0 to Cols - 1 do
+        begin
+          factor := A[i, j];
+          A[i, j] := A[k, j];
+          A[k, j] := factor;
+        end;
+      end;
+    end;
+
+    for k := i + 1 to Rows - 1 do
+    begin
+      factor := A[k, i] / A[i, i];
+      for j := i to Cols - 1 do
+        A[k, j] := A[k, j] - factor * A[i, j];
+    end;
+  end;
+
+  for i := 0 to 2 do
+  begin
+    for j := 0 to 3 do
+    begin
+        StringGrid2.Cells[j, i] := FloatToStr(A[i, j]);
+    end;
+  end;
+
+
+  X[Rows - 1] := A[Rows - 1, Cols - 1] / A[Rows - 1, Rows - 1];
+  for i := Rows - 2 downto 0 do
+  begin
+    X[i] := A[i, Cols - 1];
+    for j := i + 1 to Rows - 1 do
+      X[i] := X[i] - A[i, j] * X[j];
+    X[i] := X[i] / A[i, i];
+  end;
+
+  Result := X;
 end;
 
 function Cube(x: Double): Double;
@@ -129,7 +187,7 @@ l_sum_x:= 0;
 l_sum_y:= 0;
 l_sum_xy:= 0;
 l_sum_x_sqr:= 0;
-st := 0; stdev := 0; varian := 0; Cv := 0; sr := 0; syx := 0; r2 := 0;
+st := 0; sr := 0;
 for n := 0 to ndata-1 do
   begin
   l_sum_x:= l_sum_x + datax[n];
@@ -192,14 +250,13 @@ const
   Rows = 3;
   Cols = 4;
 var
-  n, order, i, j, k : Integer;
+  n, order, i, j: Integer;
   p_sum_x, p_sum_y, p_x_sqr_sum, p_x_cube_sum, p_x_quartic_sum, p_sum_xy, p_sum_x_sqr_y : Extended;
-  a0, a1, a3 : Extended;
-  p_std_error, p_coeff_of_determination, p_sr, p_st, factor : Extended;
+  p_std_error, p_coeff_of_determination, p_sr, p_st : Extended;
   p_y_result : array [0..1000] of Extended;
   y_mean, x_mean : Extended;
-  sle_matrix : array [0..2, 0..3] of Extended;
-  solutions : array [0..2] of Extended;
+  sle_matrix : TMatrix;
+  solutions : TArrayOfExtended;
 begin
   Series3.Clear;
   Series4.Clear;
@@ -211,6 +268,8 @@ begin
   p_x_quartic_sum := 0;
   p_sum_xy := 0;
   p_sum_x_sqr_y := 0;
+  p_st := 0;
+  p_sr := 0;
   for n:=0 to ndata-1 do
     begin
       p_sum_x := p_sum_x + datax[n];
@@ -253,47 +312,7 @@ begin
 
   SwapColumnsInStringGrid(StringGrid1, 3, 4);
 
-  for i := 0 to Rows - 2 do
-  begin
-    for k := i + 1 to Rows - 1 do
-    begin
-      if Abs(sle_matrix[i, i]) < Abs(sle_matrix[k, i]) then
-      begin
-        for j := 0 to Cols - 1 do
-        begin
-          factor := sle_matrix[i, j];
-          sle_matrix[i, j] := sle_matrix[k, j];
-          sle_matrix[k, j] := factor;
-        end;
-      end;
-    end;
-
-    for k := i + 1 to Rows - 1 do
-    begin
-      factor := sle_matrix[k, i] / sle_matrix[i, i];
-      for j := i to Cols - 1 do
-        sle_matrix[k, j] := sle_matrix[k, j] - factor * sle_matrix[i, j];
-    end;
-  end;
-
-  for i := 0 to 2 do
-  begin
-    for j := 0 to 3 do
-    begin
-        StringGrid2.Cells[j, i] := FloatToStr(sle_matrix[i, j]);
-    end;
-  end;
-
-  solutions[Rows - 1] := sle_matrix[Rows - 1, Cols - 1] / sle_matrix[Rows - 1, Rows - 1];
-  for i := Rows - 2 downto 0 do
-  begin
-    solutions[i] := sle_matrix[i, Cols - 1];
-    for j := i + 1 to Rows - 1 do
-      begin
-      solutions[i] := solutions[i] - sle_matrix[i, j] * solutions[j];
-      end;
-    solutions[i] := solutions[i] / sle_matrix[i, i];
-  end;
+  solutions := Solve3x4MatrixByGaussianElimination(StringGrid2, sle_matrix);
 
   for i := 0 to Rows-1 do
     begin
